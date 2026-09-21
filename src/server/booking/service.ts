@@ -124,18 +124,7 @@ export async function applyPaymentEvent(
 
   try {
     return await prisma.$transaction(async (tx) => {
-      // 1. Claim provider event inside transaction. Unique index on provider_event_id prevents duplicates.
-      const attempt = await tx.paymentAttempt.create({
-        data: {
-          bookingId: input.bookingId,
-          providerEventId: input.providerEventId,
-          expectedBookingVersion: input.expectedBookingVersion,
-          requestedOutcome: input.requestedOutcome,
-          result: "PROCESSING",
-        },
-      });
-
-      // 2. Fetch immutable booking association
+      // 1. Fetch immutable booking association and verify existence first
       const booking = await tx.booking.findUnique({
         where: { id: input.bookingId },
         select: {
@@ -150,6 +139,16 @@ export async function applyPaymentEvent(
         throw new BookingNotFoundError(`Booking ID ${input.bookingId} not found`);
       }
 
+      // 2. Claim provider event inside transaction. Unique index on provider_event_id prevents duplicates.
+      const attempt = await tx.paymentAttempt.create({
+        data: {
+          bookingId: input.bookingId,
+          providerEventId: input.providerEventId,
+          expectedBookingVersion: input.expectedBookingVersion,
+          requestedOutcome: input.requestedOutcome,
+          result: "PROCESSING",
+        },
+      });
       // 3. Atomically claim the booking version.
       // Eligible statuses for payment: PENDING_PAYMENT, PAYMENT_FAILED (retry)
       const claim = await tx.booking.updateMany({

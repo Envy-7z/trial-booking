@@ -1,8 +1,8 @@
 # Trial Booking System
 
-A production-grade, concurrency-safe slice of a trial class booking system built for live online education platforms.
+A focused, concurrency-safe slice of a trial class booking system built for live online education platforms.
 
-Trial classes are strictly capped at **4 confirmed students per class**. This project demonstrates database-level invariants, optimistic concurrency control, race-condition safety, and deterministic webhook idempotency under concurrent load.
+Trial classes are strictly capped at **4 confirmed students per class**. This project demonstrates database-level invariants, optimistic concurrency control, race-condition safety, and deterministic webhook idempotency under concurrent load using Next.js 16, Prisma ORM 7, and PostgreSQL 17.
 
 ---
 
@@ -45,7 +45,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. The app red
 The test suite runs against the real PostgreSQL container using Vitest to guarantee database-level concurrency behavior:
 
 ```bash
-# Run all 15 integration and invariant tests
+# Run all 16 integration and invariant tests
 npm test
 
 # Run specifically the concurrency, race condition, and burst tests
@@ -261,7 +261,7 @@ The seed script (`prisma/seed.ts`) generates verifiable test cases:
 
 ## Integration Test Matrix
 
-All 15 tests pass against the real PostgreSQL container (`npx vitest run`):
+All 16 tests pass against the real PostgreSQL container (`npx vitest run`):
 
 1. **`tests/integration/booking.test.ts`**:
    - `B1`: Creates draft booking in `PENDING_PAYMENT` without consuming seat.
@@ -273,9 +273,9 @@ All 15 tests pass against the real PostgreSQL container (`npx vitest run`):
    - `P2`: Declined payment marks `PAYMENT_FAILED`, keeps seats at 0, leaves roster empty.
    - `P3`: Retrying payment on a `PAYMENT_FAILED` booking claims new version and succeeds.
    - `P4`: Approved payment when class is full records `NO_SEAT` without charging.
+   - `P5`: Attempting payment on a nonexistent booking throws `BookingNotFoundError` (HTTP 404).
    - `I1`: Exact duplicate webhook delivery returns cached result idempotently.
    - `I2`: Reusing an event ID with conflicting payload throws `IdempotencyConflictError`.
-3. **`tests/integration/booking-race.test.ts`**:
    - `R1`: **Exact Assignment Scenario**: User A & B both select the last seat, B confirms first, A attempts payment later. Only B confirmed, A gets `NO_SEAT`.
    - `R2`: **True Concurrent Race**: Two simultaneous payment approvals for the last slot fired via `Promise.allSettled`. Exactly one `SUCCEEDED`, exactly one `NO_SEAT`.
    - `R3`: **Same-Booking Concurrent Confirmation**: User double-clicks pay; only one payment attempt claims the version, preventing double seat allocation.

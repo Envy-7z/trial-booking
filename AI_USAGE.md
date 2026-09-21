@@ -19,13 +19,12 @@ This document details how AI assistance was leveraged, questioned, steered, and 
 
 ## 3. One Place Where AI Helped Me Move Faster
 AI significantly accelerated **writing the integration test matrix**. 
-
-Constructing 15 distinct test cases covering:
+Constructing 16 distinct test cases covering:
 - Happy paths
 - Overbooking burst scenarios (5 simultaneous requests for 4 slots)
 - Double-click concurrent confirmations on the same booking
 - Webhook duplicate replays vs payload conflicts
-
+- Missing entity and foreign key failure boundaries
 Having AI rapidly draft the boilerplate for `Promise.allSettled` and seed assertions saved approximately 30–45 minutes of manual fixture typing, allowing me to focus on verifying the exact transaction boundaries and SQL predicates.
 
 ---
@@ -61,10 +60,9 @@ Every critical behavior claimed in the implementation was empirically verified:
    ```bash
    npx vitest run
    ```
-   - **Result**: `15 passed (15)` across 3 test files.
+   - **Result**: `16 passed (16)` across 3 test files.
    - Proved that in simultaneous attempts on the last seat, exactly 1 booking confirms and exactly 1 is rejected with `NO_SEAT`.
    - Proved that simultaneous payment attempts on the same booking version are serialized, with only 1 succeeding and 0 duplicate seat increments.
-2. **PostgreSQL Container Health & Native Invariants**:
    - Inspected PostgreSQL container logs and verified that CHECK constraints prevent `seats_taken` from ever becoming negative or exceeding 4.
 3. **End-to-End Next.js Build**:
    ```bash

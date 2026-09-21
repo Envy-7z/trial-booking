@@ -190,6 +190,17 @@ describe("Payment Domain Service - Invariants & Idempotency", () => {
     expect(roster[0].confirmedStudents[0].studentId).toBe(fillerStudent.id);
   });
 
+  it("P5: throws BookingNotFoundError when attempting to pay for a nonexistent booking", async () => {
+    await expect(
+      applyPaymentEvent({
+        providerEventId: "evt-nonexistent-test",
+        bookingId: "nonexistent-booking-id",
+        expectedBookingVersion: 0,
+        requestedOutcome: "APPROVE",
+      })
+    ).rejects.toThrow("Booking ID nonexistent-booking-id not found");
+  });
+
   it("I1: exact duplicate webhook delivery returns cached result idempotently with zero side effects", async () => {
     const parent = await createTestParent();
     const student = await createTestStudent(parent.id);
