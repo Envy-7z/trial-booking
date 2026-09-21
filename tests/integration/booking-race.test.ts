@@ -94,7 +94,8 @@ describe("Concurrency, Race Conditions & Invariant Hardening", () => {
     const totalConfirmedBookings = await prisma.booking.count({
       where: { trialClassId: trialClass.id, status: "CONFIRMED" },
     });
-    expect(totalConfirmedBookings).toBe(1); // 1 from this test + 3 simulated initial
+    // Exactly 1 booking confirmed in this test; 3 prior seats were simulated via initial seatsTaken counter
+    expect(totalConfirmedBookings).toBe(1);
   });
 
   it("R2: True Concurrent Race — Two simultaneous approval requests for the last available slot", async () => {

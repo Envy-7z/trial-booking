@@ -332,5 +332,5 @@ To strictly respect the 3–4 hour timebox and prioritize correctness over bread
 - **Core Domain Service & Concurrency Logic**: 60 mins
 - **Automated Integration & Race Condition Test Suite**: 45 mins
 - **Clean Anti-Slop UI & Server Actions**: 40 mins
-- **Documentation (`README.md`, `AI_USAGE.md`, walkthrough script)**: 30 mins
+- **Documentation (`README.md`, `AI_USAGE.md`)**: 30 mins
 - **Total Time**: ~3 hours 40 minutes (within 4-hour timebox).
