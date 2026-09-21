@@ -5,7 +5,7 @@ This document details how AI assistance was leveraged, questioned, steered, and 
 ---
 
 ## 1. Which AI Tools I Used
-- **Katalyst IDE (OMP harness)**: A customized coding environment with multi-model AI assistance. Used Gemini 2.5 Flash for rapid code execution and scaffolding, and Claude Opus 4 / GPT-5.6 Sol for architecture planning, code review, and concurrency design decisions.
+- **Katalyst IDE (OMP harness)**: A customized coding environment with multi-model AI assistance. Used Gemini 3.8 Flash for rapid code execution and scaffolding, and Claude Opus 4 / GPT-5.6 Sol for architecture planning, code review, and concurrency design decisions.
 - **Deep Research / Context Search**: Used during the initial phase to query current documentation regarding Next.js 16 App Router patterns and Prisma 7 PostgreSQL driver adapter conventions.
 
 ---
