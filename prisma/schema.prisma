@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  PROCESSING_PAYMENT
+  PAYMENT_FAILED
+  CONFIRMED
+}
+
+enum RequestedPaymentOutcome {
+  APPROVE
+  DECLINE
+}
+
+enum PaymentResult {
+  PROCESSING
+  SUCCEEDED
+  DECLINED
+  NO_SEAT
+}
+
+model Parent {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  students  Student[]
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("parents")
+}
+
+model Student {
+  id        String    @id @default(cuid())
+  name      String
+  age       Int
+  parentId  String    @map("parent_id")
+  parent    Parent    @relation(fields: [parentId], references: [id])
+  bookings  Booking[]
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([parentId])
+  @@map("students")
+}
+
+model TrialClass {
+  id         String    @id @default(cuid())
+  subject    String
+  teacher    String
+  startsAt   DateTime  @map("starts_at")
+  capacity   Int       @default(4)
+  seatsTaken Int       @default(0) @map("seats_taken")
+  bookings   Booking[]
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("trial_classes")
+}
+
+model Booking {
+  id              String           @id @default(cuid())
+  trialClassId    String           @map("trial_class_id")
+  studentId       String           @map("student_id")
+  status          BookingStatus    @default(PENDING_PAYMENT)
+  version         Int              @default(0)
+  trialClass      TrialClass       @relation(fields: [trialClassId], references: [id])
+  student         Student          @relation(fields: [studentId], references: [id])
+  paymentAttempts PaymentAttempt[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@unique([trialClassId, studentId], map: "bookings_class_student_key")
+  @@index([trialClassId])
+  @@index([studentId])
+  @@map("bookings")
+}
+
+model PaymentAttempt {
+  id                     String                  @id @default(cuid())
+  bookingId              String                  @map("booking_id")
+  providerEventId        String                  @unique @map("provider_event_id")
+  expectedBookingVersion Int                     @map("expected_booking_version")
+  requestedOutcome       RequestedPaymentOutcome @map("requested_outcome")
+  result                 PaymentResult           @default(PROCESSING)
+  booking                Booking                 @relation(fields: [bookingId], references: [id])
+  createdAt              DateTime                @default(now()) @map("created_at")
+  processedAt            DateTime?               @map("processed_at")
+
+  @@index([bookingId])
+  @@map("payment_attempts")
+}
