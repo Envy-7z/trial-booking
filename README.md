@@ -42,7 +42,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. The app red
 
 ## Running Automated Tests
 
-The test suite runs against the real PostgreSQL container using Vitest to guarantee database-level concurrency behavior:
+The integration suite runs against the PostgreSQL container so concurrency behavior is exercised by the database used by the application:
 
 ```bash
 # Run all 16 integration and invariant tests
@@ -61,21 +61,37 @@ npm run db:reset
 
 ## What Was Built
 
-A focused, robust slice of trial booking:
+A focused trial-booking slice:
 
-1. **Parent & Student Browsing (`/classes`)**:
-   - Context selector to switch between simulated parents and children.
-   - Live class schedule with real-time capacity badges (`X / 4 seats`, `1 Seat Remaining`, or `Full`).
-2. **Trial Booking & Mock Payment Flow (`/classes/[classId]`)**:
-   - Creates a pending booking draft without prematurely consuming capacity.
-   - Interactive payment controls: `Complete Payment (Approve)` or `Simulate Card Decline`.
-   - Specific, honest error states (e.g. if the last seat is taken while paying, the user is notified: *"This class filled up before payment completed. You were not charged."*).
-   - Retry capabilities on payment failure without creating duplicate records.
-3. **Teacher / Admin Confirmed Roster (`/admin/roster`)**:
-   - Official confirmed attendance list per class.
-   - Strictly excludes pending drafts or failed payment attempts.
-4. **Deterministic Webhook Route (`POST /api/payment-events`)**:
-   - Accepts external payment callbacks with idempotency guarantees.
+1. **Parent and student browsing (`/classes`)**:
+   - A context selector simulates the active parent and child because authentication is out of scope.
+   - Class cards show the current database-backed capacity (`X / 4 seats`, `1 Seat Remaining`, or `Full`).
+2. **Trial booking and mock payment (`/classes/[classId]`)**:
+   - Creates a `PENDING_PAYMENT` booking without consuming capacity.
+   - Records deterministic `APPROVE` or `DECLINE` mock payment outcomes.
+   - Allows payment retry on the existing failed booking and preserves prior attempts.
+   - Reports `NO_SEAT` when another booking wins the last seat. This means no successful charge is recorded by the mock payment model.
+3. **Teacher/admin confirmed roster (`/admin/roster`)**:
+   - Lists confirmed students by class.
+   - Excludes pending and failed bookings.
+4. **Mock payment webhook boundary (`POST /api/payment-events`)**:
+   - Validates webhook-shaped JSON and handles duplicate provider event IDs idempotently.
+   - This route does not integrate with or verify signatures from a real payment provider.
+
+## Demo Flow
+
+No login is required. Authentication was deliberately omitted; the parent and child selectors provide deterministic demo identities.
+
+1. Run `npm run db:reset` before the demo to restore the seed scenarios.
+2. Open `http://localhost:3000/classes`.
+3. Use Alice Chen / Emma Chen for a new booking, or Liam Chen on `class-open` to demonstrate retrying the seeded failed payment.
+4. Open `class-almost-full` to show the 3-of-4 last-seat scenario.
+5. Submit a booking, simulate a decline, then retry with approval.
+6. Open `/admin/roster` and confirm that only confirmed bookings appear.
+7. Run `npm run test:race` to demonstrate the exact two-user last-seat race and concurrent burst cases.
+8. Run `npm test` to verify duplicate booking rejection (`B3`) and the complete integration suite.
+
+The take-home does not require a cloud deployment. The video can run the application locally with Docker PostgreSQL and `npm run dev`.
 
 ---
 
@@ -198,8 +214,8 @@ WHERE "id" = $trial_class_id
    - Rows affected: `0`.
    - The transaction detects zero rows updated, immediately branches to the `NO_SEAT` path:
      - `Booking A` transitions to `PAYMENT_FAILED` (`version: 1`).
-     - `PaymentAttempt A` is recorded as `NO_SEAT`.
-     - **User A is NOT charged.**
+     - `PaymentAttempt A` is recorded as `NO_SEAT`, not `SUCCEEDED`.
+     - No successful charge is recorded by this mock payment implementation.
      - The UI presents: *"This class filled up before payment completed. You were not charged."*
 
 ### Result:
@@ -291,12 +307,22 @@ All 16 tests pass against the real PostgreSQL container (`npx vitest run`):
    - *Reason*: Matches real-world checkout where multiple parents explore slots simultaneously. Prevents abandoned carts from locking seats indefinitely without complex cron timers.
    - *Production Tradeoff*: If two parents reach payment at the exact same second for the last seat, the second parent experiences a checkout failure (`NO_SEAT`). In production, this can be paired with an optional 10-minute hold reservation using Redis or PostgreSQL timestamps.
 2. **Mock Payment Isolation**:
-   - *Choice*: Single PostgreSQL transaction handles both seat acquisition and payment recording.
-   - *Reason*: Eliminates distributed transaction complexity for this mock evaluation while maintaining 100% database consistency.
-   - *Production Tradeoff*: A real payment gateway (like Stripe) cannot participate in a local DB transaction. In production, we would use a two-phase flow: authorize payment with Stripe, reserve seat in DB, then capture charge; or refund charge asynchronously if seat acquisition fails.
+   - *Choice*: A single PostgreSQL transaction handles both seat acquisition and the mock payment-attempt record.
+   - *Reason*: Keeps the take-home deterministic while making the booking and mock-result state transition atomic.
+   - *Production Tradeoff*: This does not prove production payment safety. A real gateway such as Stripe cannot participate in the local database transaction. A production design would authorize first, atomically reserve the seat, then capture—or compensate with a refund if the seat acquisition fails.
 
 ---
 
+## Assumptions and Known Limitations
+
+- Authentication and authorization are not implemented; the parent selector is a demo-only identity mechanism.
+- Payment processing is deterministic and local. There are no real charges, payment-provider signatures, refunds, or external network calls.
+- A booking is unique per child and class across every status. Failed payments are retried on the existing booking to preserve payment history.
+- Confirmed bookings are final in this slice; cancellation and seat release after confirmation are out of scope.
+- `seats_taken` is maintained by the booking service and checked against confirmed bookings in tests and seed reconciliation. PostgreSQL CHECK constraints enforce numeric bounds, not the cross-table count.
+- The UI reads current server-rendered capacity after navigation or revalidation; it does not use realtime subscriptions.
+
+---
 ## Deliberate Scope Cuts
 
 To strictly respect the 3–4 hour timebox and prioritize correctness over breadth:

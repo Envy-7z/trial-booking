@@ -38,7 +38,7 @@ I made three critical corrections to AI-suggested designs:
 
 ### B. Rejected "Successful Charge With No Seat" Inconsistency
 - **AI Proposal**: When a race condition was lost during payment, the initial code marked `PaymentAttempt = SUCCEEDED` while setting `Booking = PAYMENT_FAILED`.
-- **Why I Corrected It**: In a real payment system, marking a payment as "succeeded" when no seat exists implies taking a parent's money without giving them a class. I introduced the explicit `NO_SEAT` payment result and ensured the customer is never charged if the atomic seat allocation returns zero rows.
+- **Why I Corrected It**: In a real payment system, marking a payment as succeeded when no seat exists would represent an unacceptable charge-without-booking state. For this deterministic mock, I introduced the explicit `NO_SEAT` result and ensured that the application does not record a successful mock charge when the atomic seat update affects zero rows. A real gateway would still require authorization, capture, webhook verification, and compensation logic outside the local database transaction.
 
 ### C. Corrected Prisma 7 Driver Adapter & Raw SQL Mappings
 - **AI Proposal**: The AI assumed Prisma 5/6 syntax (`provider = "prisma-client-js"` with automatic connection pooling in the datasource block and unquoted snake_case table names).
@@ -54,20 +54,26 @@ Because Prisma 7 moved database connection handling to JavaScript-side driver ad
 ---
 
 ## 6. How I Verified the Final Implementation
-Every critical behavior claimed in the implementation was empirically verified:
+I treated AI output as a draft and verified the resulting behavior myself:
 
-1. **Automated Vitest Concurrency Suite**:
+1. **Complete integration suite**:
    ```bash
-   npx vitest run
+   npm test
    ```
-   - **Result**: `16 passed (16)` across 3 test files.
-   - Proved that in simultaneous attempts on the last seat, exactly 1 booking confirms and exactly 1 is rejected with `NO_SEAT`.
-   - Proved that simultaneous payment attempts on the same booking version are serialized, with only 1 succeeding and 0 duplicate seat increments.
-   - Inspected PostgreSQL container logs and verified that CHECK constraints prevent `seats_taken` from ever becoming negative or exceeding 4.
-3. **End-to-End Next.js Build**:
+   - Result: `16 passed (16)` across 3 test files against PostgreSQL.
+   - Covered booking creation, duplicate prevention, declined payments, retries, missing bookings, idempotency, conflicting event IDs, last-seat races, same-booking concurrency, and burst overbooking.
+2. **Focused concurrency suite**:
    ```bash
+   npm run test:race
+   ```
+   - Result: `5 passed (5)`, including the assignment's exact last-seat sequence.
+3. **Static and production checks**:
+   ```bash
+   npm run lint
+   npx tsc --noEmit
    npm run build
    ```
-   - Verified that Turbopack compiles all server actions, route handlers, and client components with zero TypeScript or ESLint errors.
-4. **Interactive Smoke Test**:
-   - Verified full lifecycle via HTTP: `/classes` loads seed data, pending booking creates version 0, payment approval confirms and updates live roster on `/admin/roster`, and duplicate webhook events return `{ replayed: true }`.
+   - ESLint and TypeScript completed without errors, and the Next.js production build completed successfully.
+4. **Application smoke checks**:
+   - Verified the root redirect, `/classes`, `/admin/roster`, invalid webhook validation, and the typed `BOOKING_NOT_FOUND` response against a running production build.
+   - The mock service and integration tests verify booking/payment state transitions; no real payment provider or real charge was tested.

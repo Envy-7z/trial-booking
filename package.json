@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:setup": "prisma generate && prisma migrate deploy && prisma db seed",
-    "db:reset": "prisma migrate reset --force",
+    "db:reset": "prisma migrate reset --force && prisma db seed",
     "test": "vitest run",
     "test:race": "vitest run tests/integration/booking-race.test.ts"
   },
